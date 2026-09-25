@@ -3,19 +3,30 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>水下考古潜水记录</title>
+  <title>水下考古层位编录台</title>
   <style>
     * { box-sizing: border-box; }
     body { margin: 0; font-family: Arial, "PingFang SC", sans-serif; background: #e8f2f3; color: #183035; }
-    header { padding: 18px 24px; background: #fff; border-bottom: 1px solid #c9dadc; display: flex; justify-content: space-between; gap: 16px; align-items: center; }
+    header { padding: 18px 24px; background: #fff; border-bottom: 1px solid #c9dadc; display: flex; justify-content: space-between; gap: 16px; align-items: center; flex-wrap: wrap; }
     h1 { margin: 0; font-size: 26px; }
+    h2 { margin: 14px 0 8px; font-size: 17px; }
+    h3 { margin: 10px 0 6px; font-size: 14px; }
     button { border: 0; border-radius: 8px; padding: 10px 13px; background: #1d6c78; color: #fff; font-weight: 800; cursor: pointer; }
     button.secondary { background: #64777b; }
+    button.danger { background: #9a4432; }
+    button.ghost { background: #e4eef0; color: #1d6c78; border: 1px solid #b9d0d4; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
     input, select, textarea { width: 100%; border: 1px solid #c9dadc; border-radius: 6px; padding: 9px; font: inherit; background: #fff; }
-    textarea { min-height: 64px; }
+    textarea { min-height: 56px; }
     label { display: block; margin: 9px 0 5px; color: #5c7378; font-size: 13px; }
+    .tabs { display: flex; gap: 8px; }
+    .tabs button { background: #e4eef0; color: #1d6c78; }
+    .tabs button.active { background: #1d6c78; color: #fff; }
     .app { display: grid; grid-template-columns: 1fr 360px; gap: 16px; padding: 16px; }
+    .app.full { grid-template-columns: 1fr 380px; }
     .panel { background: #fff; border: 1px solid #c9dadc; border-radius: 8px; padding: 14px; }
+    .view { display: none; }
+    .view.active { display: block; }
     .map { position: relative; height: calc(100vh - 128px); min-height: 560px; overflow: hidden; background: radial-gradient(circle at 30% 20%, #5fa8b1, #0f5262 55%, #07333f); border-radius: 8px; border: 1px solid #0c4451; cursor: crosshair; }
     .wreck { position: absolute; left: 24%; top: 28%; width: 52%; height: 31%; border: 3px solid rgba(220,235,224,.55); border-radius: 48% 44% 42% 50%; transform: rotate(-9deg); }
     .rib { position: absolute; width: 2px; height: 36%; background: rgba(220,235,224,.35); top: 27%; transform: rotate(-9deg); }
@@ -23,132 +34,548 @@
     .marker.selected { outline: 4px solid rgba(255,234,124,.75); }
     .ceramic { background: #b56c38; } .wood { background: #6c4b2f; } .metal { background: #6e7880; } .unknown { background: #725ca6; }
     .toolbar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+    .toolbar.single { grid-template-columns: 1fr; }
     .list { display: grid; gap: 8px; max-height: 330px; overflow: auto; }
     .item { border: 1px solid #d7e4e5; border-radius: 8px; padding: 10px; cursor: pointer; }
     .item.active { border-color: #1d6c78; background: #eef8f9; }
+    .item.plain { cursor: default; }
     .timeline { display: grid; gap: 8px; max-height: 240px; overflow: auto; }
     .pill { display: inline-block; padding: 3px 8px; border: 1px solid #c9dadc; border-radius: 999px; font-size: 12px; }
+    .pill.ok { background: #e7f4e8; border-color: #9fc9a3; color: #2c6b34; }
+    .pill.bad { background: #fae6e1; border-color: #d9a394; color: #8a3a25; }
+    .pill.frozen { background: #fdf3dc; border-color: #ddc179; color: #7c5d12; }
     .muted { color: #5c7378; font-size: 13px; }
-    @media (max-width: 980px) { header { display: block; } .app { grid-template-columns: 1fr; } .map { height: 560px; } }
+    .layer-row { border: 1px solid #d7e4e5; border-radius: 8px; padding: 10px 12px; }
+    .layer-row.editing { border-color: #1d6c78; background: #eef8f9; }
+    .layer-row.out { background: #faf3f1; border-color: #e2bdb1; }
+    .layer-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .layer-head b { font-size: 15px; }
+    .reasons { margin: 6px 0 0; padding-left: 18px; color: #8a3a25; font-size: 13px; }
+    .row-actions { display: flex; gap: 6px; }
+    .row-actions button { padding: 5px 9px; font-size: 12px; }
+    .profile-block { display: flex; align-items: center; gap: 10px; border: 1px solid #c9dadc; border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; background: linear-gradient(90deg, #e8f2f3, #f5fafa); }
+    .seq { width: 30px; height: 30px; border-radius: 50%; background: #1d6c78; color: #fff; display: grid; place-items: center; font-weight: 800; flex: none; }
+    .profile-block .meta { font-size: 12px; color: #5c7378; }
+    .diff-list { display: grid; gap: 6px; max-height: 260px; overflow: auto; }
+    .diff-item { font-size: 13px; padding: 7px 10px; border-radius: 6px; border: 1px solid #e0d6b8; background: #fdf8ec; }
+    .diff-item.relic { border-color: #cfd8e6; background: #f1f5fb; }
+    .notice { font-size: 13px; padding: 8px 10px; border-radius: 6px; margin-bottom: 10px; background: #fdf3dc; border: 1px solid #ddc179; color: #7c5d12; }
+    .notice.bad { background: #fae6e1; border-color: #d9a394; color: #8a3a25; }
+    .notice.ok { background: #e7f4e8; border-color: #9fc9a3; color: #2c6b34; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+    .stat { font-size: 13px; color: #5c7378; }
+    @media (max-width: 980px) { header { display: block; } .app, .app.full { grid-template-columns: 1fr; } .map { height: 480px; } }
   </style>
 </head>
 <body>
   <header>
-    <div><h1>水下考古潜水记录</h1><div class="muted">点击沉船平面图添加标记，筛选、编辑并导出JSON。</div></div>
-    <button id="exportBtn">导出JSON</button>
-  </header>
-  <main class="app">
-    <section class="panel">
-      <div class="map" id="map"><div class="wreck"></div></div>
-    </section>
-    <aside class="panel">
-      <div class="toolbar">
-        <select id="filter"><option value="">全部类型</option><option value="ceramic">陶片</option><option value="wood">木构件</option><option value="metal">金属件</option><option value="unknown">未知物</option></select>
-        <select id="view"><option value="list">标记列表</option><option value="timeline">潜次时间线</option></select>
+    <div>
+      <h1>水下考古层位编录台</h1>
+      <div class="muted">点位只记坐标与深度；回船后在层位台补全层号、顶底深度、沉积描述，确认剖面并冻结发布。</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <div class="tabs">
+        <button data-view="mapView" class="active">地图点位</button>
+        <button data-view="strataView">层位编录</button>
+        <button data-view="archiveView">探方档案</button>
       </div>
-      <form id="form">
-        <h2>标记信息</h2>
-        <input name="id" type="hidden">
-        <label>编号</label><input name="code" required>
-        <label>类型</label><select name="type"><option value="ceramic">陶片</option><option value="wood">木构件</option><option value="metal">金属件</option><option value="unknown">未知物</option></select>
-        <label>潜次</label><input name="dive" placeholder="例如DIVE-04" required>
-        <label>深度</label><input name="depth" placeholder="例如18.4m" required>
-        <label>朝向</label><input name="orientation" placeholder="例如东北偏北">
-        <label>保存状态</label><input name="condition" placeholder="例如表面附着贝类">
-        <label>备注</label><textarea name="note"></textarea>
-        <div class="toolbar"><button>保存标记</button><button type="button" id="deleteBtn" class="secondary">删除</button></div>
-      </form>
-      <h2 id="listTitle">标记列表</h2>
-      <div id="list" class="list"></div>
-    </aside>
-  </main>
+      <button id="exportBtn">导出JSON</button>
+    </div>
+  </header>
+
+  <!-- 视图一：地图点位（原有地图、过滤、时间线；新增探方与层位归属） -->
+  <section id="mapView" class="view active">
+    <main class="app">
+      <section class="panel">
+        <div class="map" id="map"><div class="wreck"></div></div>
+      </section>
+      <aside class="panel">
+        <div class="toolbar">
+          <select id="trenchFilter"></select>
+          <select id="filter"><option value="">全部类型</option><option value="ceramic">陶片</option><option value="wood">木构件</option><option value="metal">金属件</option><option value="unknown">未知物</option></select>
+        </div>
+        <div class="toolbar">
+          <select id="view"><option value="list">标记列表</option><option value="timeline">潜次时间线</option></select>
+          <select id="layerFilter"><option value="">全部层位</option></select>
+        </div>
+        <form id="form">
+          <h2>标记信息</h2>
+          <input name="id" type="hidden">
+          <label>所属探方</label><select name="trenchId" id="markTrench"></select>
+          <label>编号</label><input name="code" required>
+          <label>类型</label><select name="type"><option value="ceramic">陶片</option><option value="wood">木构件</option><option value="metal">金属件</option><option value="unknown">未知物</option></select>
+          <label>潜次</label><input name="dive" placeholder="例如DIVE-04" required>
+          <label>深度</label><input name="depth" placeholder="例如18.4m" required>
+          <label>归属层位（只能归入本探方已确认层位）</label><select name="layerId" id="markLayer"><option value="">未归属</option></select>
+          <label>朝向</label><input name="orientation" placeholder="例如东北偏北">
+          <label>保存状态</label><input name="condition" placeholder="例如表面附着贝类">
+          <label>备注</label><textarea name="note"></textarea>
+          <div class="toolbar"><button>保存标记</button><button type="button" id="deleteBtn" class="secondary">删除</button></div>
+        </form>
+        <h2 id="listTitle">标记列表</h2>
+        <div id="list" class="list"></div>
+      </aside>
+    </main>
+  </section>
+
+  <!-- 视图二：层位编录台 -->
+  <section id="strataView" class="view">
+    <main class="app full">
+      <section class="panel">
+        <div class="toolbar">
+          <select id="strataTrench"></select>
+          <button id="newLayerBtn" class="ghost">＋ 新增层位</button>
+        </div>
+        <div id="frozenNotice"></div>
+        <form id="layerForm">
+          <input name="id" type="hidden">
+          <div class="toolbar">
+            <div><label>层号（同探方内不得重复）</label><input name="code" placeholder="例如 ③ / L3" required></div>
+            <div><label>顶深(m)</label><input name="top" type="number" step="0.01" placeholder="17.60" required></div>
+          </div>
+          <label>底深(m)（须深于顶深）</label><input name="bottom" type="number" step="0.01" placeholder="18.20" required>
+          <label>沉积描述</label><textarea name="sediment" placeholder="土质土色、包含物、致密程度，例如：青灰粉砂夹陶片，较致密"></textarea>
+          <div class="toolbar">
+            <button id="saveLayerBtn">登记层位并重排</button>
+            <button type="button" id="cancelLayerBtn" class="secondary">清空</button>
+          </div>
+        </form>
+        <div id="layerNotice"></div>
+
+        <h2>待编层位</h2>
+        <div id="layerList" class="list"></div>
+      </section>
+
+      <aside class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+          <h2 style="margin:0;">确认剖面</h2>
+          <span id="publishState"></span>
+        </div>
+        <div class="muted" style="margin:6px 0 10px;">深度区间重叠、层号重复或上下接触缺失的层位不进入剖面；遗物仅归属于下列层位。</div>
+        <div id="profileView"></div>
+        <div class="toolbar single" style="margin-top:10px;"><button id="publishBtn">发布剖面（冻结当前值）</button></div>
+        <h2>受影响层位与遗物</h2>
+        <div id="diffView" class="diff-list"></div>
+      </aside>
+    </main>
+  </section>
+
+  <!-- 视图三：探方档案 -->
+  <section id="archiveView" class="view">
+    <main class="app full">
+      <section class="panel">
+        <h2>探方档案</h2>
+        <div id="trenchCards" class="cards"></div>
+      </section>
+      <aside class="panel">
+        <h2 id="trenchFormTitle">新建探方</h2>
+        <form id="trenchForm">
+          <input name="id" type="hidden">
+          <label>探方编号</label><input name="code" placeholder="例如 T3" required>
+          <label>名称</label><input name="name" placeholder="例如 船首堆积探方">
+          <label>深度基准</label><input name="datum" placeholder="例如 海面基准">
+          <label>开掘潜次</label><input name="opened" placeholder="例如 DIVE-05">
+          <label>档案备注</label><textarea name="note"></textarea>
+          <div class="toolbar"><button>保存探方</button><button type="button" id="trenchResetBtn" class="secondary">清空</button></div>
+        </form>
+      </aside>
+    </main>
+  </section>
+
+  <script src="strata.js"></script>
+  <script src="archive.js"></script>
   <script>
-    const map = document.querySelector("#map");
+    const mapEl = document.querySelector("#map");
     const form = document.querySelector("#form");
-    const list = document.querySelector("#list");
-    const filter = document.querySelector("#filter");
-    const view = document.querySelector("#view");
+    const listEl = document.querySelector("#list");
+    const filterEl = document.querySelector("#filter");
+    const viewEl = document.querySelector("#view");
     const listTitle = document.querySelector("#listTitle");
+    const layerFilter = document.querySelector("#layerFilter");
+    const trenchFilter = document.querySelector("#trenchFilter");
+    const markTrenchSel = document.querySelector("#markTrench");
+    const markLayerSel = document.querySelector("#markLayer");
+    const strataTrenchSel = document.querySelector("#strataTrench");
     const typeNames = { ceramic: "陶片", wood: "木构件", metal: "金属件", unknown: "未知物" };
-    let marks = JSON.parse(localStorage.getItem("zfl30Marks") || "[]");
-    let pending = null;
-    if (!marks.length) {
-      marks = [
-        { id: crypto.randomUUID(), code: "A-017", type: "ceramic", dive: "DIVE-01", x: 42, y: 46, depth: "17.8m", orientation: "东", condition: "边缘残缺", note: "靠近船肋" },
-        { id: crypto.randomUUID(), code: "W-003", type: "wood", dive: "DIVE-02", x: 58, y: 39, depth: "18.2m", orientation: "西北", condition: "稳定", note: "疑似横梁" }
-      ];
-      save();
-    }
+    let pendingPoint = null;
+
     for (let i = 0; i < 7; i++) {
       const rib = document.createElement("div");
       rib.className = "rib";
       rib.style.left = 28 + i * 7 + "%";
-      map.appendChild(rib);
+      mapEl.appendChild(rib);
     }
-    function save() { localStorage.setItem("zfl30Marks", JSON.stringify(marks)); }
-    function render() {
-      map.querySelectorAll(".marker").forEach(el => el.remove());
-      const filtered = filter.value ? marks.filter(m => m.type === filter.value) : marks;
-      filtered.forEach(mark => {
+
+    // —— 探方下拉同步 ——
+    function trenchOptions(sel, value) {
+      sel.innerHTML = Archive.getTrenches()
+        .map(t => '<option value="' + t.id + '"' + (t.id === value ? " selected" : "") + ">" + t.code + " " + t.name + "</option>").join("");
+      if (value && !Archive.trench(value)) sel.value = "";
+    }
+    function syncTrenchSelects() {
+      const keep1 = trenchFilter.value, keep2 = markTrenchSel.value, keep3 = strataTrenchSel.value;
+      trenchOptions(trenchFilter, keep1);
+      trenchOptions(markTrenchSel, keep2);
+      trenchOptions(strataTrenchSel, keep3);
+    }
+
+    // —— 遗物归属层位下拉：只列已确认层位 ——
+    function syncLayerOptions() {
+      const t = Archive.trench(markTrenchSel.value);
+      const prof = t ? Strata.profile(t.layers) : [];
+      const chosen = form.elements.layerId.value;
+      markLayerSel.innerHTML = '<option value="">未归属</option>' + prof.map(l =>
+        '<option value="' + l.id + '">' + l.code + "（" + l.top.toFixed(2) + "–" + l.bottom.toFixed(2) + 'm）</option>').join("");
+      markLayerSel.value = prof.some(l => l.id === chosen) ? chosen : "";
+
+      const layerKeep = layerFilter.value;
+      layerFilter.innerHTML = '<option value="">全部层位</option><option value="__none__">未归属</option>' + prof.map(l =>
+        '<option value="' + l.id + '">' + l.code + "</option>").join("");
+      layerFilter.value = prof.some(l => l.id === layerKeep) || layerKeep === "__none__" ? layerKeep : "";
+    }
+
+    function currentMarks() {
+      const t = Archive.trench(trenchFilter.value);
+      return t ? t.marks : [];
+    }
+    function layerCode(t, id) {
+      const l = id && t.layers.find(x => x.id === id);
+      return l ? l.code : "";
+    }
+
+    // —— 地图与列表 ——
+    function renderMap() {
+      mapEl.querySelectorAll(".marker").forEach(el => el.remove());
+      filteredMarks().forEach(mark => {
         const el = document.createElement("button");
-        el.className = "marker " + mark.type + (mark.id === form.id.value ? " selected" : "");
+        el.className = "marker " + mark.type + (mark.id === form.elements.id.value ? " selected" : "");
         el.style.left = mark.x + "%";
         el.style.top = mark.y + "%";
         el.textContent = mark.code.slice(0, 2);
-        el.onclick = event => { event.stopPropagation(); edit(mark.id); };
-        map.appendChild(el);
+        el.title = mark.code;
+        el.onclick = event => { event.stopPropagation(); editMark(mark.id); };
+        mapEl.appendChild(el);
       });
-      if (view.value === "timeline") renderTimeline(filtered);
-      else renderList(filtered);
     }
-    function renderList(data) {
-      listTitle.textContent = "标记列表";
-      list.className = "list";
-      list.innerHTML = data.map(m => '<div class="item '+(m.id===form.id.value?'active':'')+'" data-id="'+m.id+'"><b>'+m.code+'</b> <span class="pill">'+typeNames[m.type]+'</span><div class="muted">'+m.dive+' · '+m.depth+' · '+m.orientation+'</div><div>'+m.condition+'</div></div>').join("");
-      list.querySelectorAll("[data-id]").forEach(el => el.onclick = () => edit(el.dataset.id));
+
+    function filteredMarks() {
+      let data = currentMarks();
+      if (filterEl.value) data = data.filter(m => m.type === filterEl.value);
+      if (layerFilter.value === "__none__") data = data.filter(m => !m.layerId);
+      else if (layerFilter.value) data = data.filter(m => m.layerId === layerFilter.value);
+      return data;
     }
-    function renderTimeline(data) {
-      listTitle.textContent = "潜次时间线";
-      list.className = "timeline";
-      const groups = data.reduce((map, item) => ((map[item.dive] ||= []).push(item), map), {});
-      list.innerHTML = Object.entries(groups).map(([dive, items]) => '<div class="item"><b>'+dive+'</b><div class="muted">新增'+items.length+'个标记</div>'+items.map(i => '<div>'+i.code+' · '+typeNames[i.type]+'</div>').join("")+'</div>').join("");
+
+    function renderList() {
+      const t = Archive.trench(trenchFilter.value);
+      const data = filteredMarks();
+      if (viewEl.value === "timeline") {
+        listTitle.textContent = "潜次时间线";
+        listEl.className = "timeline";
+        const groups = data.reduce((acc, item) => ((acc[item.dive] ||= []).push(item), acc), {});
+        listEl.innerHTML = Object.entries(groups).map(([dive, items]) =>
+          '<div class="item plain"><b>' + dive + '</b><div class="muted">新增' + items.length + '个标记</div>'
+          + items.map(i => '<div>' + i.code + " · " + typeNames[i.type] + (i.layerId ? " · " + layerCode(t, i.layerId) : "") + "</div>").join("")
+          + "</div>").join("") || '<div class="muted">暂无标记</div>';
+      } else {
+        listTitle.textContent = "标记列表";
+        listEl.className = "list";
+        listEl.innerHTML = data.map(m =>
+          '<div class="item ' + (m.id === form.elements.id.value ? "active" : "") + '" data-id="' + m.id + '">'
+          + "<b>" + m.code + "</b> <span class=\"pill\">" + typeNames[m.type] + "</span>"
+          + (m.layerId ? ' <span class="pill ok">' + layerCode(t, m.layerId) + "</span>" : ' <span class="pill bad">未归属</span>')
+          + '<div class="muted">' + m.dive + " · " + m.depth + " · " + (m.orientation || "—") + "</div>"
+          + "<div>" + (m.condition || "") + "</div></div>").join("") || '<div class="muted">点击沉船平面图添加标记</div>';
+        listEl.querySelectorAll("[data-id]").forEach(el => el.onclick = () => editMark(el.dataset.id));
+      }
     }
-    function edit(id) {
-      const mark = marks.find(m => m.id === id);
+
+    function renderMapView() { renderMap(); renderList(); }
+
+    function editMark(id) {
+      const t = Archive.trench(trenchFilter.value);
+      const mark = t && t.marks.find(m => m.id === id);
       if (!mark) return;
-      for (const [key, value] of Object.entries(mark)) if (form[key]) form[key].value = value;
-      pending = { x: mark.x, y: mark.y };
-      render();
+      for (const [key, value] of Object.entries(mark)) { const el = form.elements.namedItem(key); if (el) el.value = value == null ? "" : value; }
+      markTrenchSel.value = t.id;
+      syncLayerOptions();
+      markLayerSel.value = mark.layerId || "";
+      pendingPoint = { x: mark.x, y: mark.y };
+      renderMapView();
     }
-    map.addEventListener("click", event => {
-      const rect = map.getBoundingClientRect();
-      pending = { x: Number(((event.clientX - rect.left) / rect.width * 100).toFixed(2)), y: Number(((event.clientY - rect.top) / rect.height * 100).toFixed(2)) };
+
+    mapEl.addEventListener("click", event => {
+      const rect = mapEl.getBoundingClientRect();
+      pendingPoint = {
+        x: Number(((event.clientX - rect.left) / rect.width * 100).toFixed(2)),
+        y: Number(((event.clientY - rect.top) / rect.height * 100).toFixed(2))
+      };
       form.reset();
-      form.id.value = "";
-      form.code.value = "M-" + String(marks.length + 1).padStart(3, "0");
-      form.dive.value = "DIVE-01";
-      render();
+      form.elements.id.value = "";
+      markTrenchSel.value = trenchFilter.value;
+      syncLayerOptions();
+      const t = Archive.trench(markTrenchSel.value);
+      form.elements.code.value = "M-" + String(t ? t.marks.length + 1 : 1).padStart(3, "0");
+      form.elements.dive.value = "DIVE-01";
+      renderMapView();
     });
+
     form.onsubmit = event => {
       event.preventDefault();
-      if (!pending) pending = { x: 50, y: 50 };
+      const tid = markTrenchSel.value;
+      if (!tid) return;
+      const t = Archive.trench(tid);
+      if (!pendingPoint) pendingPoint = { x: 50, y: 50 };
       const data = Object.fromEntries(new FormData(form).entries());
-      if (data.id) Object.assign(marks.find(m => m.id === data.id), data, pending);
-      else marks.push({ ...data, id: crypto.randomUUID(), ...pending });
-      save(); render();
+      // 切换探方的旧标记视为新建，避免跨探方串号
+      if (data.id && !t.marks.some(m => m.id === data.id)) data.id = "";
+      data.layerId = markLayerSel.value || null;
+      data.x = pendingPoint.x; data.y = pendingPoint.y;
+      Archive.upsertMark(tid, data);
+      trenchFilter.value = tid;
+      form.reset(); form.elements.id.value = ""; pendingPoint = null;
+      renderAll();
     };
+
     document.querySelector("#deleteBtn").onclick = () => {
-      if (!form.id.value) return;
-      marks = marks.filter(m => m.id !== form.id.value);
-      form.reset(); pending = null; save(); render();
+      if (!form.elements.id.value) return;
+      Archive.deleteMark(markTrenchSel.value, form.elements.id.value);
+      form.reset(); pendingPoint = null;
+      renderAll();
     };
-    document.querySelector("#exportBtn").onclick = () => {
-      const blob = new Blob([JSON.stringify(marks, null, 2)], { type: "application/json" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob); a.download = "dive-marks.json"; a.click(); URL.revokeObjectURL(a.href);
+
+    // —— 层位编录 ——
+    const layerForm = document.querySelector("#layerForm");
+
+    function renderStrata() {
+      const t = Archive.trench(strataTrenchSel.value);
+      const notice = document.querySelector("#layerNotice");
+      const frozen = document.querySelector("#frozenNotice");
+      frozen.innerHTML = "";
+
+      if (!t) {
+        document.querySelector("#layerList").innerHTML = '<div class="muted">请先在探方档案中新建探方。</div>';
+        document.querySelector("#profileView").innerHTML = "";
+        document.querySelector("#publishState").innerHTML = "";
+        document.querySelector("#diffView").innerHTML = "";
+        return;
+      }
+
+      const reasons = Strata.reasonMap(t.layers);
+      const prof = Strata.profile(t.layers);
+      const editingId = layerForm.elements.id.value;
+      const editingFrozen = t.snapshot && t.snapshot.layers.some(l => l.id === editingId);
+      if (editingId && editingFrozen) {
+        frozen.innerHTML = '<div class="notice">正在编辑已发布层位：剖面已冻结，改值不会静默覆盖，保存后会在下方“受影响层位与遗物”列出。</div>';
+      }
+
+      const order = [...t.layers].sort((a, b) => a.top - b.top || a.bottom - b.bottom);
+      document.querySelector("#layerList").innerHTML = order.map(l => {
+        const problems = reasons[l.id] || [];
+        const host = prof.find(p => p.id === l.id);
+        const relicCount = t.marks.filter(m => m.layerId === l.id).length;
+        return '<div class="layer-row ' + (problems.length ? "out" : "") + (l.id === editingId ? " editing" : "") + '">'
+          + '<div class="layer-head"><div><b>' + l.code + "</b> "
+          + (host ? '<span class="pill ok">确认 · 第' + prof.findIndex(p => p.id === l.id) + 1 + '层</span>' : '<span class="pill bad">不进剖面</span>')
+          + ' <span class="pill">遗物 ' + relicCount + "</span></div>"
+          + '<div class="row-actions"><button data-edit="' + l.id + '">改约深/关系</button>'
+          + '<button data-del="' + l.id + '" class="danger">删</button></div></div>'
+          + '<div class="muted">顶 ' + (Number.isFinite(l.top) ? l.top.toFixed(2) : "—") + "m ／ 底 "
+          + (Number.isFinite(l.bottom) ? l.bottom.toFixed(2) : "—") + "m · 厚 "
+          + (Number.isFinite(l.top) && Number.isFinite(l.bottom) ? (l.bottom - l.top).toFixed(2) : "—") + "m</div>"
+          + '<div>' + (l.sediment || '<span class="muted">（缺沉积描述）</span>') + "</div>"
+          + (problems.length ? '<ul class="reasons">' + problems.map(r => "<li>" + r + "</li>").join("") + "</ul>" : "")
+          + "</div>";
+      }).join("") || '<div class="muted">尚未登记层位，点“新增层位”开始。</div>';
+      document.querySelector("#layerList").querySelectorAll("[data-edit]").forEach(btn =>
+        btn.onclick = () => editLayer(btn.dataset.edit));
+      document.querySelector("#layerList").querySelectorAll("[data-del]").forEach(btn =>
+        btn.onclick = () => deleteLayer(btn.dataset.del));
+
+      // 确认剖面
+      document.querySelector("#profileView").innerHTML = prof.length ? prof.map((l, i) => {
+        const count = t.marks.filter(m => m.layerId === l.id).length;
+        return '<div class="profile-block"><div class="seq">' + (i + 1) + "</div><div>"
+          + "<b>" + l.code + "</b> <span class=\"meta\">" + l.top.toFixed(2) + "–" + l.bottom.toFixed(2)
+          + "m（厚 " + (l.bottom - l.top).toFixed(2) + "m）· 遗物 " + count + "件</span>"
+          + "<div>" + (l.sediment || '<span class="muted">（缺沉积描述）</span>') + "</div></div></div>";
+      }).join("") : '<div class="muted">当前没有可进入剖面的已确认层位。</div>';
+
+      const state = document.querySelector("#publishState");
+      state.innerHTML = t.snapshot
+        ? '<span class="pill frozen">已发布 ' + new Date(t.snapshot.at).toLocaleString("zh-CN") + "</span>"
+        : '<span class="pill">未发布</span>';
+
+      renderDiff(t);
+    }
+
+    function renderDiff(t) {
+      const box = document.querySelector("#diffView");
+      if (!t.snapshot) {
+        const out = t.layers.filter(l => Strata.reasonsOf(t.layers, l.id).length);
+        box.innerHTML = '<div class="muted">剖面尚未发布。发布将冻结当前确认剖面与遗物归属；'
+          + (out.length ? "另有 " + out.length + " 个层位因问题未进剖面。" : "发布后任何改值都会在此列出受影响项。") + "</div>";
+        return;
+      }
+      const d = Archive.diff(t.id);
+      if (!d.hasChanges) { box.innerHTML = '<div class="notice ok">当前工作数据与已发布剖面一致。</div>'; return; }
+      const lines = [];
+      d.added.forEach(l => lines.push(['', '<b>' + l.code + "</b> 为发布后新增的已确认层位"]));
+      d.removed.forEach(r => lines.push(['', "<b>" + r.snapshot.code + "</b> 已退出剖面（"
+        + (r.deleted ? "层位已删除" : r.reasons.join("；")) + "），原冻结值保留"]));
+      d.changed.forEach(c => lines.push(['', "<b>" + c.layer.code + "</b> 改值："
+        + c.fields.map(f => f.field + " " + f.from + " → " + f.to).join("、")]));
+      d.reordered.forEach(r => lines.push(['', "<b>" + r.layer.code + "</b> 位次：第 " + r.from + " 层 → 第 " + r.to + " 层"]));
+      d.relicChanges.forEach(r => lines.push(["relic", "<b>" + r.mark.code + "</b> " + r.text]));
+      box.innerHTML = lines.map(([cls, html]) => '<div class="diff-item ' + cls + '">' + html + "</div>").join("");
+    }
+
+    function editLayer(id) {
+      const t = Archive.trench(strataTrenchSel.value);
+      const l = t.layers.find(x => x.id === id);
+      if (!l) return;
+      for (const [key, value] of Object.entries(l)) { const el = layerForm.elements.namedItem(key); if (el) el.value = value == null ? "" : value; }
+      renderStrata();
+    }
+
+    function deleteLayer(id) {
+      const t = Archive.trench(strataTrenchSel.value);
+      const l = t.layers.find(x => x.id === id);
+      if (!l) return;
+      const count = t.marks.filter(m => m.layerId === id).length;
+      if (!confirm("删除层位 " + l.code + "？" + (count ? "其下 " + count + " 件遗物将变为未归属。" : "")
+        + (t.snapshot && t.snapshot.layers.some(s => s.id === id) ? "\n该层位在已发布剖面中，删除将列入受影响项。" : ""))) return;
+      Archive.deleteLayer(t.id, id);
+      if (layerForm.elements.id.value === id) layerForm.reset(), layerForm.elements.id.value = "";
+      renderAll();
+    }
+
+    document.querySelector("#newLayerBtn").onclick = () => { layerForm.reset(); layerForm.elements.id.value = ""; document.querySelector("#layerNotice").innerHTML = ""; layerForm.elements.code.focus(); renderStrata(); };
+    document.querySelector("#cancelLayerBtn").onclick = () => { layerForm.reset(); layerForm.elements.id.value = ""; document.querySelector("#layerNotice").innerHTML = ""; renderStrata(); };
+
+    layerForm.onsubmit = event => {
+      event.preventDefault();
+      const t = Archive.trench(strataTrenchSel.value);
+      if (!t) return;
+      const data = Object.fromEntries(new FormData(layerForm).entries());
+      const result = Archive.upsertLayer(t.id, data);
+      const profIds = new Set(result.profile.map(l => l.id));
+      const unassigned = t.marks.filter(m => !m.layerId);
+      const seq = result.profile.findIndex(l => l.id === result.layer.id) + 1;
+      const notice = document.querySelector("#layerNotice");
+      const ok = profIds.has(result.layer.id);
+      notice.innerHTML = '<div class="notice ' + (ok ? "ok" : "bad") + '">'
+        + (ok ? "层位 " + result.layer.code + " 已确认，排在第 " + seq + " 层；后续层位已重排。"
+          : "层位 " + result.layer.code + " 未进入剖面：" + Strata.reasonsOf(t.layers, result.layer.id).join("；"))
+        + (unassigned.length ? " 当前探方有 " + unassigned.length + " 件遗物未归属。" : "")
+        + (t.snapshot ? " 剖面曾发布，改动已记入“受影响层位与遗物”，未静默改值。" : "")
+        + "</div>";
+      layerForm.reset(); layerForm.elements.id.value = "";
+      renderAll();
     };
-    filter.onchange = render; view.onchange = render;
-    render();
+
+    document.querySelector("#publishBtn").onclick = () => {
+      const t = Archive.trench(strataTrenchSel.value);
+      if (!t) return;
+      const prof = Strata.profile(t.layers);
+      if (!prof.length) { alert("没有可发布的已确认层位。"); return; }
+      if (t.snapshot) {
+        const d = Archive.diff(t.id);
+        if (!confirm((d.hasChanges
+          ? "剖面已发布，重新发布将冻结新值，受影响：\n"
+            + "新增层位 " + d.added.length + "、退出 " + d.removed.length + "、改值 " + d.changed.length
+            + "、位次变化 " + d.reordered.length + "、遗物 " + d.relicChanges.length + " 件。\n确认覆盖冻结快照？"
+          : "当前与已发布剖面一致，仍重新发布（更新发布时间）？"))) return;
+      }
+      Archive.publish(t.id);
+      renderAll();
+    };
+
+    // —— 探方档案 ——
+    const trenchForm = document.querySelector("#trenchForm");
+    function renderArchive() {
+      const box = document.querySelector("#trenchCards");
+      box.innerHTML = Archive.getTrenches().map(t => {
+        const prof = Strata.profile(t.layers);
+        const out = t.layers.length - prof.length;
+        const d = t.snapshot ? Archive.diff(t.id) : null;
+        const pending = d ? [d.added.length, d.removed.length, d.changed.length, d.reordered.length, d.relicChanges.length]
+          .reduce((a, b) => a + b, 0) : 0;
+        return '<div class="item plain"><div class="layer-head"><div><b>' + t.code + "</b> " + t.name + "</div>"
+          + '<div class="row-actions"><button data-edit="' + t.id + '">编辑</button>'
+          + '<button data-open="' + t.id + '" class="ghost">去编录</button></div></div>'
+          + '<div class="stat">基准：' + (t.datum || "—") + " · 开掘：" + (t.opened || "—")
+          + "<br>层位 " + t.layers.length + "（确认 " + prof.length + (out ? "，问题 " + out : "") + "）· 遗物 "
+          + t.marks.length + " 件</div>"
+          + '<div style="margin-top:6px;">'
+          + (t.snapshot ? '<span class="pill frozen">剖面已发布 ' + new Date(t.snapshot.at).toLocaleDateString("zh-CN") + "</span>"
+                        : '<span class="pill">未发布</span>')
+          + (pending ? ' <span class="pill bad">发布后待核改动 ' + pending + "</span>" : "")
+          + (t.note ? '<div class="muted" style="margin-top:6px;">' + t.note + "</div>" : "")
+          + "</div></div>";
+      }).join("") || '<div class="muted">还没有探方。</div>';
+      box.querySelectorAll("[data-edit]").forEach(b => b.onclick = () => editTrench(b.dataset.edit));
+      box.querySelectorAll("[data-open]").forEach(b => b.onclick = () => {
+        strataTrenchSel.value = b.dataset.open;
+        switchView("strataView");
+      });
+    }
+
+    function editTrench(id) {
+      const t = Archive.trench(id);
+      if (!t) return;
+      document.querySelector("#trenchFormTitle").textContent = "编辑探方 " + t.code;
+      for (const [key, value] of Object.entries(t)) { const el = trenchForm.elements.namedItem(key); if (el) el.value = value == null ? "" : value; }
+    }
+    document.querySelector("#trenchResetBtn").onclick = () => {
+      trenchForm.reset(); trenchForm.elements.id.value = "";
+      document.querySelector("#trenchFormTitle").textContent = "新建探方";
+    };
+    trenchForm.onsubmit = event => {
+      event.preventDefault();
+      const data = Object.fromEntries(new FormData(trenchForm).entries());
+      const t = Archive.upsertTrench(data);
+      trenchForm.reset(); trenchForm.elements.id.value = "";
+      document.querySelector("#trenchFormTitle").textContent = "新建探方";
+      renderAll();
+      strataTrenchSel.value = t.id;
+      renderAll();
+    };
+
+    // —— 视图切换 ——
+    function switchView(id) {
+      document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === id));
+      document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("active", b.dataset.view === id));
+      renderAll();
+    }
+    document.querySelectorAll(".tabs button").forEach(btn => btn.onclick = () => switchView(btn.dataset.view));
+
+    function renderAll() {
+      syncTrenchSelects();
+      syncLayerOptions();
+      renderMapView();
+      renderStrata();
+      renderArchive();
+    }
+
+    filterEl.onchange = renderMapView;
+    viewEl.onchange = renderMapView;
+    layerFilter.onchange = renderMapView;
+    trenchFilter.onchange = () => {
+      form.reset(); form.elements.id.value = ""; pendingPoint = null;
+      markTrenchSel.value = trenchFilter.value;
+      syncLayerOptions();
+      renderMapView();
+    };
+    markTrenchSel.onchange = () => {
+      form.elements.id.value = ""; pendingPoint = null;
+      syncLayerOptions();
+    };
+    strataTrenchSel.onchange = () => { layerForm.reset(); layerForm.elements.id.value = ""; document.querySelector("#layerNotice").innerHTML = ""; renderStrata(); };
+
+    document.querySelector("#exportBtn").onclick = () => Archive.exportJSON();
+
+    renderAll();
   </script>
 </body>
 </html>
